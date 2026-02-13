@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+
+    <!-- App Identity -->
+    <title>DOZ3 - Patient App</title>
+    <meta name="description" content="DOZ3 Patient App - Your health companion for prescriptions, pharmacy orders, and health ID" />
+    <meta name="author" content="DOZ3 Health" />
+
+    <!-- PWA -->
+    <link rel="manifest" href="./manifest.json" />
+    <meta name="theme-color" content="#0F4C81" />
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="./doz3-logo.png" />
+
+    <!-- iOS PWA Support -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="DOZ3" />
+    <link rel="apple-touch-icon" href="./icons/icon.svg" />
+
+    <!-- Android / Chrome -->
+    <meta name="mobile-web-app-capable" content="yes" />
+
+    <!-- Inter Font (Design Guidelines) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+    <!-- Prevent phone number detection -->
+    <meta name="format-detection" content="telephone=no" />
+
+    <!-- Open Graph for sharing -->
+    <meta property="og:title" content="DOZ3 - Patient App" />
+    <meta property="og:description" content="Your health companion for prescriptions, pharmacy orders, and health ID" />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="./icons/icon.svg" />
+
+    <style>
+      /* Prevent overscroll bounce on iOS */
+      html, body {
+        overscroll-behavior: none;
+        -webkit-tap-highlight-color: transparent;
+      }
+      /* Safe area insets for notch devices */
+      body {
+        padding-top: env(safe-area-inset-top);
+        padding-bottom: env(safe-area-inset-bottom);
+        padding-left: env(safe-area-inset-left);
+        padding-right: env(safe-area-inset-right);
+      }
+    </style>
+  </head>
+
+  <body>
+    <div id="root"></div>
+
+    <script type="module" src="/src/main.tsx"></script>
+
+    <!-- Register Service Worker for PWA -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function() {
+          navigator.serviceWorker.register('./sw.js').catch(function() {});
+        });
+      }
+    </script>
+  </body>
+</html>

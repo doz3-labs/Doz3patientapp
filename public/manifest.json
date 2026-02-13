@@ -1,0 +1,27 @@
+{
+  "name": "DOZ3 Patient App",
+  "short_name": "DOZ3",
+  "description": "Your health companion - prescriptions, pharmacy orders, and health ID in one place",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#ffffff",
+  "theme_color": "#0F4C81",
+  "icons": [
+    {
+      "src": "./icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "./icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "categories": ["health", "medical", "lifestyle"],
+  "prefer_related_applications": false
+}

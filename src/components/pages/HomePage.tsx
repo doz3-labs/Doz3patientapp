@@ -3,50 +3,16 @@ import { motion } from 'framer-motion';
 import { Camera, Stethoscope, ShoppingBag, Package, ChevronRight } from 'lucide-react';
 import { NavigationContext } from '../../App';
 import { MedicineClock } from '../MedicineClock';
-import { getGreeting, DESIGN_COLORS } from '../../data/medications';
+import { DESIGN_COLORS } from '../../data/medications';
 
 interface HomePageProps {
   navigation: NavigationContext;
 }
 
 export function HomePage({ navigation }: HomePageProps) {
-  const greeting = getGreeting();
-
   return (
     <div style={{ fontFamily: 'Inter, sans-serif', paddingBottom: 24 }}>
-      {/* ─── GREETING ─────────────────────────────────── */}
-      <div style={{ padding: '20px 16px 0' }}>
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-        >
-          <h1 style={{
-            fontSize: 28,
-            fontWeight: 700,
-            color: '#111827',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 10,
-          }}>
-            <span style={{ fontSize: 34 }}>{greeting.emoji}</span>
-            {greeting.text}, Rajesh
-          </h1>
-          <p style={{
-            fontSize: 15,
-            color: '#6B7280',
-            marginTop: 4,
-            marginLeft: 44,
-          }}>
-            {greeting.textHindi} · {new Date().toLocaleDateString('en-IN', {
-              weekday: 'long',
-              day: 'numeric',
-              month: 'long'
-            })}
-          </p>
-        </motion.div>
-      </div>
-
-      {/* ─── MEDICINE CLOCK (Hero Section) ────────────── */}
+      {/* ─── SACHET CARDS (Hero Section) ─────────────── */}
       <div style={{ padding: '0 12px' }}>
         <MedicineClock />
       </div>

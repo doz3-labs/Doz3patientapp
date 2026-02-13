@@ -1,14 +1,14 @@
 import React from 'react';
 import { Bell, ShoppingCart } from 'lucide-react';
 import { NavigationContext } from '../App';
+import { getGreeting } from '../data/medications';
 
 interface HeaderProps {
   navigation: NavigationContext;
 }
 
 export function Header({ navigation }: HeaderProps) {
-  // Only show minimal header on home page
-  const isHome = navigation.currentPage === 'home';
+  const greeting = getGreeting();
 
   return (
     <header
@@ -20,11 +20,11 @@ export function Header({ navigation }: HeaderProps) {
     >
       <div style={{ padding: '12px 16px' }}>
         <div className="flex items-center justify-between">
-          {/* Left: DOZ3 Logo + Location */}
+          {/* Left: Logo + Greeting */}
           <button
             onClick={() => navigation.navigate('home')}
             className="flex items-center"
-            style={{ gap: 12 }}
+            style={{ gap: 12, border: 'none', background: 'none', cursor: 'pointer' }}
           >
             <img
               src="./doz3-logo.png"
@@ -35,28 +35,14 @@ export function Header({ navigation }: HeaderProps) {
                 objectFit: 'contain',
               }}
             />
-            <div>
-              <p style={{
-                fontSize: 16,
-                fontWeight: 600,
-                color: '#111827',
-                textAlign: 'left',
-              }}>
-                DOZ3
-              </p>
-              <p style={{
-                fontSize: 12,
-                color: '#6B7280',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 4,
-              }}>
-                <svg width="12" height="12" fill="#6B7280" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
-                </svg>
-                Indiranagar, Bengaluru
-              </p>
-            </div>
+            <p style={{
+              fontSize: 18,
+              fontWeight: 700,
+              color: '#111827',
+              textAlign: 'left',
+            }}>
+              {greeting.text}, Rajesh
+            </p>
           </button>
 
           {/* Right: Notification + Cart (larger touch targets) */}

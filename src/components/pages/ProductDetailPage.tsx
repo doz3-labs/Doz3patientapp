@@ -16,8 +16,8 @@ export function ProductDetailPage({ navigation }: ProductDetailPageProps) {
 
   const product = navigation.pageData || {
     id: 'med-001',
-    name: 'Crocin Advance 500mg',
-    brand: 'Crocin',
+    name: 'Paracetamol 500mg',
+    brand: 'DOZ3',
     category: 'medicines',
     price: 30,
     originalPrice: 38,

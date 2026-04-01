@@ -1,14 +1,20 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { NavigationContext } from '../../App';
 import { ArrowLeft, Camera, Upload, FileText, CheckCircle } from 'lucide-react';
+import { useToast } from '../Toast';
+import { getJson, postJson } from '../../lib/api';
+import { getPatientSession, setPatientSession } from '../../lib/session';
 
 interface UploadPrescriptionPageProps {
   navigation: NavigationContext;
 }
 
 export function UploadPrescriptionPage({ navigation }: UploadPrescriptionPageProps) {
+  const { showToast } = useToast();
   const [uploadedFile, setUploadedFile] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const session = useMemo(() => getPatientSession(), []);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -21,11 +27,84 @@ export function UploadPrescriptionPage({ navigation }: UploadPrescriptionPagePro
     }
   };
 
-  const handleSubmit = () => {
-    setSubmitted(true);
-    setTimeout(() => {
-      navigation.navigate('orders');
-    }, 2000);
+  const ensurePatient = async () => {
+    if (session?.patientId) return session;
+    try {
+      const created = await postJson<{ id: string; abha_address: string }>(
+        "/patients",
+        {
+          phone_number: "9876543210",
+          address_line1: "42, 1st Cross, Indiranagar",
+          address_line2: null,
+          city: "Bengaluru",
+          state: "Karnataka",
+          pincode: "560038",
+          country: "India",
+          abha_address: "rajesh.kumar@abdm",
+        }
+      );
+      const s = { patientId: created.id, fullName: "Rajesh Kumar", phone: "9876543210", abhaId: created.abha_address };
+      setPatientSession(s);
+      return s;
+    } catch {
+      const localId = `local-${crypto?.randomUUID?.() ?? String(Date.now())}`;
+      const s = { patientId: localId, fullName: "Rajesh Kumar", phone: "9876543210", abhaId: "rajesh.kumar@abdm" };
+      setPatientSession(s);
+      return s;
+    }
+  };
+
+  const ensureMedicationIds = async () => {
+    type MedicationRead = { id: string; name: string; dosage: string; form_factor: string };
+    const list = await getJson<MedicationRead[]>("/medications");
+
+    async function getOrCreate(name: string, dosage: string, form_factor: string) {
+      const found = list.find((m) => m.name === name && m.dosage === dosage);
+      if (found) return found.id;
+      const created = await postJson<MedicationRead>("/medications", { name, dosage, form_factor });
+      list.push(created);
+      return created.id;
+    }
+
+    return {
+      glimepirideId: await getOrCreate("Glimepiride", "1mg", "tablet"),
+      metforminId: await getOrCreate("Metformin", "500mg", "tablet"),
+      telmisartanId: await getOrCreate("Telmisartan", "40mg", "tablet"),
+    };
+  };
+
+  const handleSubmit = async () => {
+    setSubmitting(true);
+    try {
+      const s = await ensurePatient();
+
+      // Redundancy:
+      // - If backend is available: create real Prescription + DoseSchedules.
+      // - If backend is unavailable: just proceed and rely on local cached UX.
+      if (!s.patientId.startsWith("local-")) {
+        const ids = await ensureMedicationIds();
+        const validUntil = new Date();
+        validUntil.setMonth(validUntil.getMonth() + 1);
+        await postJson("/prescriptions", {
+          patient_id: s.patientId,
+          abdm_record_id: `abdm-demo-${Date.now()}`,
+          valid_until: validUntil.toISOString().slice(0, 10),
+          duration_days: 30,
+          dose_schedules: [
+            { medication_id: ids.glimepirideId, time_slot: "Morning", quantity: 1 },
+            { medication_id: ids.metforminId, time_slot: "Morning", quantity: 1 },
+            { medication_id: ids.telmisartanId, time_slot: "Morning", quantity: 1 },
+            { medication_id: ids.metforminId, time_slot: "Night", quantity: 1 },
+          ],
+        });
+      }
+
+      showToast("Prescription submitted");
+      setSubmitted(true);
+      setTimeout(() => navigation.navigate('orders'), 1200);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   if (submitted) {
@@ -189,10 +268,11 @@ export function UploadPrescriptionPage({ navigation }: UploadPrescriptionPagePro
           <div className="px-4 py-4">
             <button
               onClick={handleSubmit}
-              className="w-full bg-[#10B981] text-white py-4 rounded-xl hover:bg-[#059669] transition-colors active:scale-95 flex items-center justify-center gap-2"
+              disabled={submitting}
+              className="w-full bg-[#10B981] text-white py-4 rounded-xl hover:bg-[#059669] transition-colors active:scale-95 flex items-center justify-center gap-2 disabled:opacity-60"
             >
               <CheckCircle className="w-5 h-5" />
-              Submit for Verification
+              {submitting ? "Submitting..." : "Submit for Verification"}
             </button>
           </div>
         </div>

@@ -2,6 +2,7 @@ import React from 'react';
 import { Bell, ShoppingCart } from 'lucide-react';
 import { NavigationContext } from '../App';
 import { getGreeting } from '../data/medications';
+import { getPatientSession } from '../lib/session';
 
 interface HeaderProps {
   navigation: NavigationContext;
@@ -9,6 +10,8 @@ interface HeaderProps {
 
 export function Header({ navigation }: HeaderProps) {
   const greeting = getGreeting();
+  const session = getPatientSession();
+  const firstName = session?.fullName?.split(' ')?.[0] || 'there';
 
   return (
     <header
@@ -41,7 +44,7 @@ export function Header({ navigation }: HeaderProps) {
               color: '#111827',
               textAlign: 'left',
             }}>
-              {greeting.text}, Rajesh
+              {greeting.text}, {firstName}
             </p>
           </button>
 

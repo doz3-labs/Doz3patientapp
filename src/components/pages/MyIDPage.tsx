@@ -1,14 +1,20 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { NavigationContext } from '../../App';
-import { Download, Share2, Check } from 'lucide-react';
+import { Download, Share2, Check, Link2 } from 'lucide-react';
+import { useToast } from '../Toast';
+import { postJson } from '../../lib/api';
+import { getPatientSession, setPatientSession } from '../../lib/session';
 
 interface MyIDPageProps {
   navigation: NavigationContext;
 }
 
 export function MyIDPage({ navigation }: MyIDPageProps) {
+  const { showToast } = useToast();
   const [downloaded, setDownloaded] = useState(false);
   const [shared, setShared] = useState(false);
+  const [linking, setLinking] = useState(false);
+  const session = useMemo(() => getPatientSession(), []);
 
   const handleDownload = () => {
     setDownloaded(true);
@@ -27,13 +33,73 @@ export function MyIDPage({ navigation }: MyIDPageProps) {
     setTimeout(() => setShared(false), 2000);
   };
 
+  const handleLinkAbha = async () => {
+    setLinking(true);
+    try {
+      // Redundancy chain:
+      // 1) Try create patient on backend
+      // 2) If backend fails, create a local-only session (still lets UX flow)
+      const created = await postJson<{ id: string; abha_address: string }>(
+        "/patients",
+        {
+          phone_number: "9876543210",
+          address_line1: "42, 1st Cross, Indiranagar",
+          address_line2: null,
+          city: "Bengaluru",
+          state: "Karnataka",
+          pincode: "560038",
+          country: "India",
+          abha_address: "rajesh.kumar@abdm",
+        }
+      );
+      setPatientSession({
+        patientId: created.id,
+        fullName: "Rajesh Kumar",
+        phone: "9876543210",
+        abhaId: created.abha_address,
+      });
+      showToast("ABHA linked successfully");
+      window.location.reload();
+    } catch {
+      const localId = `local-${crypto?.randomUUID?.() ?? String(Date.now())}`;
+      setPatientSession({ patientId: localId, fullName: "Rajesh Kumar", phone: "9876543210", abhaId: "rajesh.kumar@abdm" });
+      showToast("ABHA linked (offline mode)");
+      window.location.reload();
+    } finally {
+      setLinking(false);
+    }
+  };
+
   return (
     <div className="min-h-screen pb-6">
       {/* Header */}
       <div className="bg-[#0F4C81] px-4 py-6 text-white">
         <h1 className="text-2xl mb-1">My Health ID</h1>
-        <p className="text-sm text-white/80">Present this at DOZ3 partner stores</p>
+        <p className="text-sm text-white/80">
+          {session ? "Linked and ready to use" : "Link your ABHA ID to enable prescriptions & tracking"}
+        </p>
       </div>
+
+      {!session && (
+        <div className="px-4 mt-6">
+          <button
+            disabled={linking}
+            onClick={handleLinkAbha}
+            className="w-full bg-white rounded-2xl shadow-sm border-2 border-blue-200 p-4 flex items-center justify-between active:scale-[0.99]"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center border border-blue-200">
+                <Link2 className="w-6 h-6 text-[#0F4C81]" />
+              </div>
+              <div className="text-left">
+                <div className="text-base font-semibold text-gray-900">Link ABHA ID</div>
+                <div className="text-xs text-gray-500">1-tap demo link (backend + offline fallback)</div>
+              </div>
+            </div>
+            <div className="text-sm font-semibold text-[#0F4C81]">{linking ? "Linking..." : "Link"}</div>
+          </button>
+        </div>
+      )}
 
       {/* ID Card */}
       <div className="px-4 mt-6">
@@ -45,7 +111,7 @@ export function MyIDPage({ navigation }: MyIDPageProps) {
               <img src="./doz3-logo.png" alt="DOZ3" className="w-10 h-10 rounded-lg bg-white/20 p-1" />
               <div>
                 <p className="text-sm text-white/80 mb-0.5">DOZ3 Health ID</p>
-                <p className="text-xl tracking-wide font-mono">DZ-2026-RAJ-4521</p>
+                <p className="text-xl tracking-wide font-mono">{session ? `DZ-${session.patientId.slice(0, 4).toUpperCase()}-2026` : "Not linked"}</p>
               </div>
             </div>
           </div>
@@ -57,7 +123,7 @@ export function MyIDPage({ navigation }: MyIDPageProps) {
                 <span className="text-3xl">👤</span>
               </div>
               <div className="flex-1">
-                <h2 className="text-xl text-gray-900 mb-1">Rajesh Kumar</h2>
+                <h2 className="text-xl text-gray-900 mb-1">{session?.fullName ?? "Rajesh Kumar"}</h2>
                 <div className="space-y-1 text-sm text-gray-600">
                   <p>Age: 58 years</p>
                   <p>Blood Group: B+</p>

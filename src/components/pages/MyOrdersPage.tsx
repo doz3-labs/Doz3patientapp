@@ -1,65 +1,100 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { NavigationContext } from '../../App';
 import { Package, ChevronRight, MapPin, Clock, RotateCcw } from 'lucide-react';
+import { cachedGet } from '../../lib/api';
+import { getPatientSession } from '../../lib/session';
+import { useToast } from '../Toast';
 
 interface MyOrdersPageProps {
   navigation: NavigationContext;
 }
 
 export function MyOrdersPage({ navigation }: MyOrdersPageProps) {
+  const { showToast } = useToast();
   const [activeTab, setActiveTab] = useState<'active' | 'completed'>('active');
   const [selectedOrder, setSelectedOrder] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [ordersFromApi, setOrdersFromApi] = useState<any[]>([]);
+  const session = useMemo(() => getPatientSession(), []);
 
-  const activeOrders = [
+  // Local fallback (wireframe-level UX stays intact even offline)
+  const fallbackOrders = [
     {
-      id: 'ORD-2024',
-      date: '10 Feb 2026',
-      items: ['Glimepiride 1mg (30 tabs)', 'Metformin 500mg (60 tabs)', 'Telmisartan 40mg (30 tabs)'],
-      status: 'Out for Delivery',
-      total: 450,
-      estimatedTime: 'Within 60 minutes',
-      statusColor: '#10B981',
-      doctor: 'Dr. Priya Sharma'
-    },
-    {
-      id: 'ORD-2020',
-      date: '8 Feb 2026',
-      items: ['Accu-Chek Test Strips (50s)', 'Omron BP Monitor Cuff'],
+      id: 'ORD-DEMO',
+      date: 'Today',
+      items: ['Glimepiride + Metformin + Telmisartan'],
       status: 'Processing',
-      total: 950,
+      total: 450,
       estimatedTime: 'Within 60 minutes',
       statusColor: '#0F4C81'
     }
   ];
 
-  const completedOrders = [
-    {
-      id: 'ORD-2010',
-      date: '15 Jan 2026',
-      items: ['Metformin 500mg (60 tabs)', 'Telmisartan 40mg (30 tabs)'],
-      status: 'Delivered',
-      total: 330,
-      deliveredDate: '15 Jan 2026',
-      doctor: 'Dr. Priya Sharma'
-    },
-    {
-      id: 'ORD-1998',
-      date: '10 Dec 2025',
-      items: ['Metformin 500mg (30 tabs)', 'Shelcal 500mg', 'Becosules Z'],
-      status: 'Delivered',
-      total: 420,
-      deliveredDate: '11 Dec 2025'
-    },
-    {
-      id: 'ORD-1985',
-      date: '25 Nov 2025',
-      items: ['Omron BP Monitor HEM-7120', 'Accu-Chek Active Glucometer'],
-      status: 'Delivered',
-      total: 2500,
-      deliveredDate: '28 Nov 2025'
+  useEffect(() => {
+    let mounted = true;
+    async function load() {
+      try {
+        if (!session?.patientId || session.patientId.startsWith("local-")) {
+          if (mounted) setOrdersFromApi([]);
+          return;
+        }
+        const { value, source } = await cachedGet<any[]>(
+          `/patients/${encodeURIComponent(session.patientId)}/orders`,
+          { ttlMs: 15_000, cacheKey: `orders:${session.patientId}` }
+        );
+        if (!mounted) return;
+        setOrdersFromApi(value ?? []);
+        if (source !== "network") showToast("Showing cached data");
+      } catch {
+        if (mounted) setOrdersFromApi([]);
+      } finally {
+        if (mounted) setLoading(false);
+      }
     }
-  ];
+    load();
+    return () => {
+      mounted = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
+  const STATUS_LABELS: Record<string, string> = {
+    PaymentPending: "Payment Pending",
+    PendingPharmacistApproval: "Awaiting pharmacist approval",
+    ApprovedForPrinting: "In sorting facility",
+    PackagingQCCompleted: "Packaging complete",
+    Dispatched: "Out for delivery",
+    Delivered: "Delivered",
+  };
+
+  const STATUS_COLORS: Record<string, string> = {
+    PaymentPending: "#6B7280",
+    PendingPharmacistApproval: "#F97316",
+    ApprovedForPrinting: "#10B981",
+    PackagingQCCompleted: "#8B5CF6",
+    Dispatched: "#0F4C81",
+    Delivered: "#059669",
+  };
+
+  const mappedOrders = useMemo(() => {
+    if (!ordersFromApi.length) return fallbackOrders;
+    return ordersFromApi.map((o: any) => {
+      const status = STATUS_LABELS[o.status] ?? o.status;
+      return {
+        id: `ORD-${String(o.id).slice(0, 6).toUpperCase()}`,
+        date: new Date(o.created_at ?? Date.now()).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }),
+        items: [`${o.duration_days}-day medication pouch`],
+        status,
+        total: 450,
+        estimatedTime: o.status === "Delivered" ? "Delivered" : `${o.start_date} to ${o.end_date}`,
+        statusColor: STATUS_COLORS[o.status] ?? "#0F4C81"
+      };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ordersFromApi]);
+
+  const activeOrders = mappedOrders.filter(o => o.status !== 'Delivered');
+  const completedOrders = mappedOrders.filter(o => o.status === 'Delivered');
   const orders = activeTab === 'active' ? activeOrders : completedOrders;
 
   return (
@@ -92,7 +127,9 @@ export function MyOrdersPage({ navigation }: MyOrdersPageProps) {
 
       {/* Orders List */}
       <div className="px-4 mt-4 space-y-3">
-        {orders.length === 0 ? (
+        {loading ? (
+          <div className="text-sm text-gray-500 px-2 py-6">Loading orders…</div>
+        ) : orders.length === 0 ? (
           <div className="text-center py-12">
             <Package className="w-16 h-16 text-gray-300 mx-auto mb-4" />
             <p className="text-gray-500 mb-4">No orders found</p>

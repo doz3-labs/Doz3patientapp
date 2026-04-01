@@ -1,0 +1,32 @@
+---
+description: API contract & endpoints mapping for DOZ3 ecosystem
+alwaysApply: true
+---
+
+# DOZ3 Backend API Contract (for Patient App)
+
+## Current backend (unified)
+
+- Base URL is configurable per environment.
+- Use Swagger/OpenAPI from the backend to confirm shapes before wiring screens.
+
+## Naming
+
+- Use backend entity names consistently:
+  - `Patient`
+  - `Prescription`
+  - `DoseSchedule`
+
+## Approval/Tracking primitives
+
+- `DoseSchedule.approved` + `approvedAt` represent pharmacist approval for sorting facility.
+- Patient app should treat schedules as:
+  - pending approval
+  - approved
+  - fulfilled (future)
+
+## Request rules
+
+- Never hardcode `localhost` in app code. Use environment variables.
+- All mutations must update local state immediately (optimistic) and roll back on failure.
+

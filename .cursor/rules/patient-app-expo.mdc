@@ -1,0 +1,46 @@
+---
+description: Expo/React Native conventions for DOZ3 Patient App
+globs: **/*.{ts,tsx,js,jsx}
+alwaysApply: true
+---
+
+# DOZ3 Patient App (Mobile) — Expo + React Native
+
+## Stack decision
+
+- Build the patient app as **React Native (Expo)**, TypeScript-first.
+- Prefer **Expo Router** for navigation (file-based routes) unless a screen requires React Navigation primitives directly.
+
+## UI/UX bar (non-negotiable)
+
+- Mobile-first, thumb-friendly touch targets (minimum 44px height).
+- Always handle safe areas (notches) and keyboard avoidance.
+- Use skeleton/loading states, optimistic UI for approvals/updates.
+- All networked screens must have: loading, empty, error, retry.
+
+## Component rules
+
+- Use functional components.
+- Prefer small composable components and dedicated hooks (`useAbhaLink`, `useMedicationSchedule`, etc).
+- No “god components”; split: `Screen` + `View` + `hooks` + `api`.
+
+## Styling
+
+- Use a consistent design system (tokens for spacing, colors, typography).
+- Avoid inline magic numbers; centralize common spacing/typography.
+
+## Backend wiring conventions
+
+- Keep API calls in `src/lib/api/*` and data hooks in `src/lib/queries/*`.
+- All API calls must:
+  - include a typed response shape
+  - throw a human-readable error message
+  - support cancellation where applicable
+- Use an env var for base URL (Expo `EXPO_PUBLIC_API_BASE_URL`).
+
+## When converting wireframes/images
+
+- Match layout, spacing, and typography 1:1 first.
+- Then layer in interactions (link ABHA, OTP, permissions, tracking pouches).
+- Provide accessible labels for critical inputs/buttons.
+

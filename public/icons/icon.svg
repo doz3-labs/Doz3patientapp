@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#0F4C81"/>
+  <g transform="translate(256,256)">
+    <!-- Cross/Plus symbol -->
+    <rect x="-30" y="-100" width="60" height="200" rx="12" fill="white"/>
+    <rect x="-100" y="-30" width="200" height="60" rx="12" fill="white"/>
+    <!-- DOZ3 text -->
+    <text y="180" text-anchor="middle" font-family="Arial,sans-serif" font-weight="bold" font-size="72" fill="white" letter-spacing="4">DOZ3</text>
+  </g>
+</svg>

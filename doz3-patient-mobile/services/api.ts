@@ -50,10 +50,12 @@ export interface LoginResponse {
 }
 
 export async function loginPatient(phone: string, otp = "123456", name = "") {
+  // Field is `phone`, not `phone_number` — the latter 422s. `role` is
+  // deliberately not sent: the server reads it from the users table, and any
+  // client-supplied role is ignored.
   const { data } = await api.post<LoginResponse>("/auth/login", {
-    phone_number: phone,
+    phone,
     otp,
-    role: "patient",
     name,
   });
   return data;

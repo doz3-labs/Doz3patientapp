@@ -15,7 +15,12 @@ import { usePatientStore } from "@/store/patient";
 import { MedicineClock } from "@/components/MedicineClock";
 import { QuickActions } from "@/components/QuickActions";
 import { DoctorOrderCard } from "@/components/DoctorOrderCard";
-import { fetchActiveDoseSchedule, type FulfillmentLine } from "@/services/api";
+import {
+  fetchDailySchedule,
+  markDoseTaken,
+  type DailySchedule,
+  type TimeSlot,
+} from "@/services/api";
 
 interface SlotData {
   key: "morning" | "afternoon" | "night";
@@ -28,41 +33,66 @@ interface SlotData {
   taken: boolean;
 }
 
-function buildSlots(lines: FulfillmentLine[]): SlotData[] {
-  const morning: { name: string; dosage: string }[] = [];
-  const afternoon: { name: string; dosage: string }[] = [];
-  const night: { name: string; dosage: string }[] = [];
+/** Presentation for each server slot. The server is authoritative on content. */
+const SLOT_META: Record<
+  TimeSlot,
+  Omit<SlotData, "pills" | "taken">
+> = {
+  Morning: {
+    key: "morning", title: "Morning Sachet", timeRange: "6:00 AM - 12:00 PM",
+    icon: "sunny", color: DOZ3.morning, bgColor: DOZ3.morningBg,
+  },
+  Noon: {
+    key: "afternoon", title: "Afternoon Sachet", timeRange: "12:00 PM - 6:00 PM",
+    icon: "partly-sunny", color: DOZ3.afternoon, bgColor: DOZ3.afternoonBg,
+  },
+  Night: {
+    key: "night", title: "Night Sachet", timeRange: "6:00 PM - 12:00 AM",
+    icon: "moon", color: DOZ3.night, bgColor: DOZ3.nightBg,
+  },
+};
 
-  for (const l of lines) {
-    if (l.morning > 0) morning.push({ name: l.medication_name, dosage: `${l.morning}x ${l.medication_dosage}` });
-    if (l.noon > 0) afternoon.push({ name: l.medication_name, dosage: `${l.noon}x ${l.medication_dosage}` });
-    if (l.night > 0) night.push({ name: l.medication_name, dosage: `${l.night}x ${l.medication_dosage}` });
-  }
+const SLOT_BY_KEY: Record<string, TimeSlot> = {
+  morning: "Morning",
+  afternoon: "Noon",
+  night: "Night",
+};
 
-  return [
-    { key: "morning", title: "Morning Sachet", timeRange: "6:00 AM - 12:00 PM", icon: "sunny", color: DOZ3.morning, bgColor: DOZ3.morningBg, pills: morning, taken: false },
-    { key: "afternoon", title: "Afternoon Sachet", timeRange: "12:00 PM - 6:00 PM", icon: "partly-sunny", color: DOZ3.afternoon, bgColor: DOZ3.afternoonBg, pills: afternoon, taken: false },
-    { key: "night", title: "Night Sachet", timeRange: "6:00 PM - 12:00 AM", icon: "moon", color: DOZ3.night, bgColor: DOZ3.nightBg, pills: night, taken: false },
-  ];
+/**
+ * Quantities come straight from the server's per-date dose calculation, so a
+ * taper shows the step for today and a weekly drug only appears on the day it
+ * is due. The old version rendered next month's packing totals, which summed a
+ * taper's phases into one number and listed weekly medication every day.
+ */
+function buildSlots(schedule: DailySchedule): SlotData[] {
+  return schedule.slots.map((s) => ({
+    ...SLOT_META[s.time_slot],
+    pills: s.medications.map((m) => ({
+      name: m.medication_name,
+      dosage: `${m.quantity}x ${m.medication_dosage}`,
+    })),
+    taken: s.taken,
+  }));
 }
 
-const defaultSlots: SlotData[] = [
-  {
-    key: "morning", title: "Morning Sachet", timeRange: "6:00 AM - 12:00 PM",
-    icon: "sunny", color: DOZ3.morning, bgColor: DOZ3.morningBg, taken: false,
-    pills: [{ name: "Amlodipine", dosage: "1x 5mg" }, { name: "Metformin", dosage: "1x 500mg" }],
-  },
-  {
-    key: "afternoon", title: "Afternoon Sachet", timeRange: "12:00 PM - 6:00 PM",
-    icon: "partly-sunny", color: DOZ3.afternoon, bgColor: DOZ3.afternoonBg, taken: false,
-    pills: [{ name: "Pantoprazole", dosage: "1x 40mg" }],
-  },
-  {
-    key: "night", title: "Night Sachet", timeRange: "6:00 PM - 12:00 AM",
-    icon: "moon", color: DOZ3.night, bgColor: DOZ3.nightBg, taken: false,
-    pills: [{ name: "Atorvastatin", dosage: "1x 10mg" }, { name: "Metformin", dosage: "1x 500mg" }],
-  },
-];
+/**
+ * Shown before the first load and whenever the schedule cannot be fetched.
+ *
+ * Empty on purpose. This previously fell back to a hardcoded list of real drug
+ * names, so a patient who lost connectivity was shown medication that might not
+ * be theirs, indistinguishable from the real thing. An empty sachet is honest;
+ * an invented one is not.
+ */
+const EMPTY_SLOTS: SlotData[] = (
+  ["Morning", "Noon", "Night"] as TimeSlot[]
+).map((s) => ({ ...SLOT_META[s], pills: [], taken: false }));
+
+function todayISO(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+    d.getDate()
+  ).padStart(2, "0")}`;
+}
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -70,19 +100,21 @@ export default function HomeScreen() {
   const prescriptions = usePatientStore((s) => s.prescriptions);
   const unread = usePatientStore((s) => s.unreadCount);
 
-  const [slots, setSlots] = useState<SlotData[]>(defaultSlots);
+  const [slots, setSlots] = useState<SlotData[]>(EMPTY_SLOTS);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadError, setLoadError] = useState(false);
   const [hasDoctorOrder, setHasDoctorOrder] = useState(true);
 
   const fetchData = useCallback(async () => {
     if (!patient?.id) return;
     try {
-      const data = await fetchActiveDoseSchedule(patient.id);
-      if (data.lines?.length) {
-        setSlots(buildSlots(data.lines));
-      }
+      const data = await fetchDailySchedule(patient.id);
+      setSlots(buildSlots(data));
+      setLoadError(false);
     } catch {
-      // use defaults
+      // Show empty sachets and say so, rather than inventing a medication list.
+      setSlots(EMPTY_SLOTS);
+      setLoadError(true);
     }
   }, [patient?.id]);
 
@@ -96,10 +128,19 @@ export default function HomeScreen() {
     setRefreshing(false);
   };
 
-  const handleMarkTaken = (key: string) => {
-    setSlots((prev) =>
-      prev.map((s) => (s.key === key ? { ...s, taken: true } : s))
-    );
+  const handleMarkTaken = async (key: string) => {
+    if (!patient?.id) return;
+    const slot = SLOT_BY_KEY[key];
+    if (!slot) return;
+
+    // Optimistic: confirming a dose should feel instant. Reverted below if the
+    // write fails, so the tick never claims a record the server does not have.
+    setSlots((prev) => prev.map((s) => (s.key === key ? { ...s, taken: true } : s)));
+    try {
+      await markDoseTaken(patient.id, todayISO(), slot);
+    } catch {
+      setSlots((prev) => prev.map((s) => (s.key === key ? { ...s, taken: false } : s)));
+    }
   };
 
   const firstName = patient?.fullName?.split(" ")[0] ?? "Patient";
@@ -154,6 +195,17 @@ export default function HomeScreen() {
                 </Text>
               </View>
             </View>
+            {loadError && (
+              <View className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+                <Text className="text-sm font-medium text-amber-900">
+                  Couldn't load today's sachets
+                </Text>
+                <Text className="mt-0.5 text-xs text-amber-800">
+                  Pull down to retry. Don't take anything from memory — check
+                  your printed pouch.
+                </Text>
+              </View>
+            )}
             <MedicineClock slots={slots} onMarkTaken={handleMarkTaken} />
           </View>
 

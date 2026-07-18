@@ -174,9 +174,78 @@ export interface ActiveDoseScheduleResponse {
   lines: FulfillmentLine[];
 }
 
+/**
+ * Next month's packing totals. This is a PLANNING view — the numbers are units
+ * summed across the whole window, not a dose. Do not render it as "take this
+ * now"; the home screen used to, and showed a monthly total as a single dose.
+ * For what a patient takes today, use fetchDailySchedule.
+ */
 export async function fetchActiveDoseSchedule(patientId: string) {
   const { data } = await api.get<ActiveDoseScheduleResponse>(
     `/fulfillment/${patientId}/details`
+  );
+  return data;
+}
+
+// ── Daily schedule + adherence ──
+
+export type TimeSlot = "Morning" | "Noon" | "Night";
+
+export interface ScheduledMedication {
+  medication_id: string;
+  medication_name: string;
+  medication_dosage: string;
+  medication_form_factor: string;
+  /** Units to take at this slot on this date — a dose, not a window total. */
+  quantity: number;
+}
+
+export interface ScheduledSlot {
+  time_slot: TimeSlot;
+  medications: ScheduledMedication[];
+  taken: boolean;
+}
+
+export interface DailySchedule {
+  patient_id: string;
+  date: string;
+  slots: ScheduledSlot[];
+}
+
+/** What the patient actually takes on `date` (default today), slot by slot. */
+export async function fetchDailySchedule(patientId: string, date?: string) {
+  const { data } = await api.get<DailySchedule>(
+    `/patients/${patientId}/schedule`,
+    { params: date ? { date } : undefined }
+  );
+  return data;
+}
+
+export interface DoseTaken {
+  id: string;
+  patient_id: string;
+  scheduled_date: string;
+  time_slot: TimeSlot;
+  taken_at: string;
+  source: string;
+}
+
+/**
+ * Confirm a sachet taken. Idempotent per (patient, date, slot) server-side.
+ *
+ * This is the write that makes adherence real: it is the doctor's non-monetary
+ * win and the reason a doctor routes patients here. Before this existed the
+ * home screen only flipped local state, so nothing a patient confirmed ever
+ * reached the server and the doctor's adherence view had nothing to read.
+ */
+export async function markDoseTaken(
+  patientId: string,
+  scheduledDate: string,
+  timeSlot: TimeSlot
+) {
+  const { data } = await api.post<DoseTaken>(
+    `/patients/${patientId}/adherence/mark-taken`,
+    { scheduled_date: scheduledDate, time_slot: timeSlot, source: "patient_app" }
   );
   return data;
 }
